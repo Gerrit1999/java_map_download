@@ -1,27 +1,15 @@
 package com.jmd.task;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
-
-import com.jmd.callback.LogCallback;
-import com.jmd.callback.TileMergeFirstFinishBack;
-import com.jmd.rx.Topic;
-import com.jmd.rx.service.InnerMqService;
-import com.jmd.ui.common.CommonDialog;
-import com.jmd.util.MyFileUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
-
+import cn.hutool.core.date.TimeInterval;
+import cn.hutool.core.util.NumberUtil;
 import com.jmd.async.task.executor.TileCalculationTask;
 import com.jmd.async.task.executor.TileDownloadTask;
 import com.jmd.async.task.executor.TileErrorDownloadTask;
 import com.jmd.async.task.executor.TileMergeTask;
 import com.jmd.callback.LayerDownloadCallback;
+import com.jmd.callback.LogCallback;
 import com.jmd.callback.TileDownloadedCallback;
+import com.jmd.callback.TileMergeFirstFinishBack;
 import com.jmd.common.StaticVar;
 import com.jmd.model.geo.Bound;
 import com.jmd.model.geo.Polygon;
@@ -35,11 +23,22 @@ import com.jmd.model.task.TaskBlockEntity;
 import com.jmd.model.task.TaskCreateEntity;
 import com.jmd.model.task.TaskExecEntity;
 import com.jmd.model.task.TaskInstEntity;
-import com.jmd.http.HttpClient;
+import com.jmd.rx.Topic;
+import com.jmd.rx.service.InnerMqService;
+import com.jmd.ui.common.CommonDialog;
 import com.jmd.util.GeoUtils;
+import com.jmd.util.MyFileUtils;
 import com.jmd.util.TaskUtils;
-
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 
 @Slf4j
 @Component
@@ -50,8 +49,6 @@ public class TaskStepFunc {
 
     private final InnerMqService innerMqService = InnerMqService.getInstance();
 
-    @Autowired
-    private HttpClient httpClient;
     @Autowired
     private TileCalculationTask tileCalculationTask;
     @Autowired
@@ -67,7 +64,7 @@ public class TaskStepFunc {
         ConcurrentHashMap<Integer, TaskInstEntity> eachLayerTask = new ConcurrentHashMap<>();
         this.innerMqService.pub(Topic.DOWNLOAD_CONSOLE_LOG, "开始计算...");
         long count = 0L;
-        long start = System.currentTimeMillis();
+        TimeInterval ti = new TimeInterval();
         for (int z : taskCreate.getZoomList()) {
             try {
                 TaskInstEntity inst = tileTaskInstCalculation(z, taskCreate.getPolygons(), (e) -> {
@@ -81,7 +78,6 @@ public class TaskStepFunc {
                 log.error("Tile Calculation Error", e);
             }
         }
-        long end = System.currentTimeMillis();
         taskAllInfo.setTileUrl(taskCreate.getTileUrl());
         taskAllInfo.setImgType(taskCreate.getImgType());
         taskAllInfo.setTileName(taskCreate.getTileName());
@@ -97,7 +93,7 @@ public class TaskStepFunc {
         taskAllInfo.setEachLayerTask(eachLayerTask);
         taskAllInfo.setErrorTiles(new ConcurrentHashMap<>());
         this.innerMqService.pub(Topic.DOWNLOAD_CONSOLE_LOG, "计算完成");
-        this.innerMqService.pub(Topic.DOWNLOAD_CONSOLE_LOG, "需要下载的总数：" + count + "，瓦片图计算所用时间：" + (end - start) / 1000 + "秒");
+        this.innerMqService.pub(Topic.DOWNLOAD_CONSOLE_LOG, "需要下载的总数：" + count + "，瓦片图计算所用时间：" + ti.intervalRestart() / 1000 + "秒");
         this.innerMqService.pub(Topic.DOWNLOAD_CONSOLE_LOG, "开始下载...");
         return taskAllInfo;
     }
@@ -135,10 +131,11 @@ public class TaskStepFunc {
         ConcurrentHashMap<String, TaskBlockEntity> blocks = new ConcurrentHashMap<>();
         long count = 0L;
         boolean isCanceled = false;
-        for (Future<TaskBlockEntity> future : futures) {
+        for (int i = 0; i < futures.size(); i++) {
             if (isCanceled) {
                 break;
             }
+            Future<TaskBlockEntity> future = futures.get(i);
             try {
                 TaskBlockEntity block = future.get();
                 if (block.getRealCount() > 0) {
@@ -153,6 +150,7 @@ public class TaskStepFunc {
             } catch (ExecutionException e2) {
                 e2.printStackTrace();
             }
+            logCB.execute("计算中：" + NumberUtil.formatPercent((double) (i + 1) / futures.size(), 2));
         }
         inst.setRealCount(count);
         inst.setAllCount(countX * countY);
@@ -378,7 +376,7 @@ public class TaskStepFunc {
             }
             var xiangsudaxiao = mergeImageWidth * mergeImageHeight;
             this.innerMqService.pub(Topic.DOWNLOAD_CONSOLE_LOG, "合并后的图片width：" + mergeImageWidth + "，height：" + mergeImageHeight + "，像素大小："
-                    + xiangsudaxiao);
+                                                                + xiangsudaxiao);
             if (xiangsudaxiao > (long) Integer.MAX_VALUE) {
                 this.innerMqService.pub(Topic.DOWNLOAD_CONSOLE_LOG, "该" + zoom + "级地图合并后像素大小大于int最大值" + Integer.MAX_VALUE + "，合并时间可能会稍长，建议低配置电脑不要执行超大尺寸合并");
             }
