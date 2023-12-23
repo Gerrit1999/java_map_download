@@ -1,14 +1,13 @@
 package com.jmd.http;
 
-import java.io.IOException;
-
-import com.jmd.util.MyFileUtils;
+import com.jmd.inst.DownloadAmountInstance;
+import com.jmd.model.result.DownloadResult;
 import com.jmd.util.ImageUtils;
+import com.jmd.util.MyFileUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import com.jmd.model.result.DownloadResult;
-import com.jmd.inst.DownloadAmountInstance;
+import java.io.IOException;
 
 @Component
 public class HttpDownload {
@@ -68,7 +67,7 @@ public class HttpDownload {
             }
             default -> {
                 // 0, 1
-                return ImageUtils.saveImageByOpenCV(imgData, pathAndName);
+                return ImageUtils.saveImageDirectly(imgData, pathAndName);
             }
         }
     }

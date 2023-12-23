@@ -1,5 +1,6 @@
 package com.jmd.util;
 
+import cn.hutool.core.io.FileUtil;
 import lombok.Getter;
 import org.apache.commons.io.FileUtils;
 import org.opencv.core.Mat;
@@ -54,16 +55,19 @@ public class ImageUtils {
             return Type.JPG;
         }
         if (Type.WEBP.getA() == data[0] && Type.WEBP.getB() == data[1] && Type.WEBP.getC() == data[2] && Type.JPG.getD() == data[3] &&
-                Type.WEBP.getType().equals(new String(new char[]{(char) data[8], (char) data[9], (char) data[10], (char) data[11]}))) {
+            Type.WEBP.getType().equals(new String(new char[]{(char) data[8], (char) data[9], (char) data[10], (char) data[11]}))) {
             return Type.WEBP;
         }
         return null;
     }
 
     // 直接保存图片
-    public static long saveImageDirectly(byte[] bytes, String pathAndName) throws IOException {
+    public static long saveImageDirectly(byte[] bytes, String pathAndName) {
+        if (bytes == null || bytes.length == 0) {
+            return -1;
+        }
+        FileUtil.writeBytes(bytes, pathAndName);
         var file = new File(pathAndName);
-        FileUtils.writeByteArrayToFile(file, bytes);
         if (file.exists() && file.isFile()) {
             return file.length();
         } else {
@@ -73,6 +77,9 @@ public class ImageUtils {
 
     // 通过OpenCV保存图片
     public static long saveImageByOpenCV(byte[] bytes, String pathAndName) throws IOException {
+        if (bytes == null || bytes.length == 0) {
+            return -1;
+        }
         var file = new File(pathAndName);
         FileUtils.createParentDirectories(file);
         var matByte = new MatOfByte(bytes);
