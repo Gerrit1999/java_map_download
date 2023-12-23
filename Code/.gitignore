@@ -39,7 +39,7 @@ out/
 *.DS_Store
 context/
 log/
-setting/
+setting/ApplicationSetting
 native/
 
 assets/
