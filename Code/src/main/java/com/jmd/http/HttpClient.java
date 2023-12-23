@@ -1,18 +1,8 @@
 package com.jmd.http;
 
-import java.io.IOException;
-import java.io.Serial;
-import java.net.InetSocketAddress;
-import java.net.Proxy;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.concurrent.TimeUnit;
-
+import com.jmd.util.RequestUtils;
 import jakarta.annotation.PostConstruct;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
-
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.ConnectionPool;
 import okhttp3.FormBody;
@@ -22,6 +12,21 @@ import okhttp3.Request;
 import okhttp3.Request.Builder;
 import okhttp3.RequestBody;
 import okhttp3.Response;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
+import org.springframework.stereotype.Component;
+
+import java.io.IOException;
+import java.io.Serial;
+import java.net.InetSocketAddress;
+import java.net.Proxy;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Random;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Component
@@ -35,7 +40,9 @@ public class HttpClient {
         private static final long serialVersionUID = 9078863629526057150L;
 
         {
-            put("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36 Edg/113.0.1774.57");
+            put(HttpHeaders.ORIGIN, "https://map.tianditu.gov.cn");
+            put(HttpHeaders.REFERER, "https://map.tianditu.gov.cn/");
+            put("Sec-Fetch-Site", "same-site");
         }
     };
 
@@ -50,7 +57,10 @@ public class HttpClient {
     @Value("${okhttp.keep-alive-duration}")
     private int keepAliveDuration;
 
+    @Setter
     private OkHttpClient okHttpClient;
+
+    private final Random random = new Random();
 
     @PostConstruct
     private void init() {
@@ -199,21 +209,32 @@ public class HttpClient {
      * 获取文件流
      */
     public byte[] getFileBytes(String url, HashMap<String, String> headers) {
+        url = URLDecoder.decode(url, StandardCharsets.UTF_8);
+        headers.put(HttpHeaders.USER_AGENT, RequestUtils.getRandomUserAgent());
+
+        if (url.contains("tianditu")) {
+            int randomT = random.nextInt(8);
+            url = url.replaceFirst("t\\d", "t" + randomT);
+        }
+        log.info("url = {}", url);
+
         Builder builder = new Request.Builder().url(url);
         for (Entry<String, String> entry : headers.entrySet()) {
             builder.addHeader(entry.getKey(), entry.getValue());
         }
         Request request = builder.build();
         Response response = null;
-        byte[] buf = null;
+        byte[] buf = new byte[0];
         try {
             response = okHttpClient.newCall(request).execute();
             if (response.isSuccessful()) {
                 assert response.body() != null;
                 buf = response.body().bytes();
+            } else {
+                log.error("code = {}", response.code());
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            log.error(e.getMessage());
         } finally {
             if (response != null) {
                 response.close();

@@ -37,6 +37,7 @@ dependencies {
     implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.2")
     implementation("commons-io:commons-io:2.13.0")
     implementation("com.alibaba.fastjson2:fastjson2:2.0.33")
+    implementation("cn.hutool:hutool-all:5.8.23")
     implementation(files("lib/ui/flatlaf-3.0.jar"))
     implementation(files("lib/ui/flatlaf-intellij-themes-3.0.jar"))
     implementation(files("lib/ui/JTattoo-1.6.13.jar"))
